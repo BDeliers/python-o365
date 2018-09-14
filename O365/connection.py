@@ -148,6 +148,7 @@ class Connection(with_metaclass(Singleton)):
 											 redirect_uri='https://outlook.office365.com/owa/',
 											 scope=['https://graph.microsoft.com/Mail.ReadWrite',
 													'https://graph.microsoft.com/Mail.Send',
+													'https://graph.microsoft.com/Calendars.ReadWrite',
 													'offline_access'], )
 			oauth = connection.oauth
 			auth_url, state = oauth.authorization_url(
@@ -232,3 +233,151 @@ class Connection(with_metaclass(Singleton)):
 
 		response_values = [MicroDict(x) for x in response_json['value']]
 		return response_values
+
+	@staticmethod
+	def post_data(request_url, data, **kwargs):
+		""" Posts data for specified url, data and arguments, adding the auth and proxy information to the url
+
+		:param request_url: url to request
+		:param data: data to post
+		:param kwargs: any keyword arguments to pass to the requests api
+		:return: response object
+		"""
+		connection = Connection()
+
+		if not connection.is_valid():
+			raise RuntimeError('Connection is not configured, please use "O365.Connection" '
+							   'to set username and password or OAuth2 authentication')
+
+		con_params = {}
+		if connection.proxy_dict:
+			con_params['proxies'] = connection.proxy_dict
+		if connection.default_headers:
+			con_params['headers'] = connection.default_headers
+		con_params.update(kwargs)
+
+		log.info('Requesting URL: {}'.format(request_url))
+
+		if connection.api_version == '1.0':
+			con_params['auth'] = connection.auth
+			response = requests.post(request_url, data, **con_params)
+		else:
+			try:
+				response = connection.oauth.post(request_url, data, **con_params)
+			except TokenExpiredError:
+				log.info('Token is expired, fetching a new token')
+				token = connection.oauth.refresh_token(Connection._oauth2_token_url, client_id=connection.client_id,
+													   client_secret=connection.client_secret)
+				log.info('New token fetched')
+				save_token(token, connection.token_path)
+
+				response = connection.oauth.post(request_url, data, **con_params)
+
+		log.info('Received response from URL {}'.format(response.url))
+
+		if response.status_code == 401:
+			raise RuntimeError('API returned status code 401 Unauthorized, check the connection credentials')
+
+		response_json = response.json()
+		if 'id' not in response_json:
+			raise RuntimeError('Something went wrong, received an unexpected result \n{}'.format(response_json))
+
+		return response_json
+
+	@staticmethod
+	def patch_data(request_url, data, **kwargs):
+		""" Patches for specified url, data and arguments, adding the auth and proxy information to the url
+
+		:param request_url: url to request
+		:param data: updated data
+		:param kwargs: any keyword arguments to pass to the requests api
+		:return: response object
+		"""
+		connection = Connection()
+
+		if not connection.is_valid():
+			raise RuntimeError('Connection is not configured, please use "O365.Connection" '
+							   'to set username and password or OAuth2 authentication')
+
+		con_params = {}
+		if connection.proxy_dict:
+			con_params['proxies'] = connection.proxy_dict
+		if connection.default_headers:
+			con_params['headers'] = connection.default_headers
+		con_params.update(kwargs)
+
+		log.info('Requesting URL: {}'.format(request_url))
+
+		if connection.api_version == '1.0':
+			con_params['auth'] = connection.auth
+			response = requests.patch(request_url, data, **con_params)
+		else:
+			try:
+				response = connection.oauth.patch(request_url, data, **con_params)
+			except TokenExpiredError:
+				log.info('Token is expired, fetching a new token')
+				token = connection.oauth.refresh_token(Connection._oauth2_token_url, client_id=connection.client_id,
+													   client_secret=connection.client_secret)
+				log.info('New token fetched')
+				save_token(token, connection.token_path)
+
+				response = connection.oauth.patch(request_url, data, **con_params)
+
+		log.info('Received response from URL {}'.format(response.url))
+
+		if response.status_code == 401:
+			raise RuntimeError('API returned status code 401 Unauthorized, check the connection credentials')
+
+		response_json = response.json()
+		if 'id' not in response_json:
+			raise RuntimeError('Something went wrong, received an unexpected result \n{}'.format(response_json))
+
+		return response_json
+
+	@staticmethod
+	def delete_data(request_url, **kwargs):
+		""" Deletes data for specified url and arguments, adding the auth and proxy information to the url
+
+		:param request_url: url to request
+		:param kwargs: any keyword arguments to pass to the requests api
+		:return: True if it worked
+		"""
+		connection = Connection()
+
+		if not connection.is_valid():
+			raise RuntimeError('Connection is not configured, please use "O365.Connection" '
+							   'to set username and password or OAuth2 authentication')
+
+		con_params = {}
+		if connection.proxy_dict:
+			con_params['proxies'] = connection.proxy_dict
+		if connection.default_headers:
+			con_params['headers'] = connection.default_headers
+		con_params.update(kwargs)
+
+		log.info('Requesting URL: {}'.format(request_url))
+
+		if connection.api_version == '1.0':
+			con_params['auth'] = connection.auth
+			response = requests.delete(request_url, **con_params)
+		else:
+			try:
+				response = connection.oauth.delete(request_url, **con_params)
+			except TokenExpiredError:
+				log.info('Token is expired, fetching a new token')
+				token = connection.oauth.refresh_token(Connection._oauth2_token_url, client_id=connection.client_id,
+													   client_secret=connection.client_secret)
+				log.info('New token fetched')
+				save_token(token, connection.token_path)
+
+				response = connection.oauth.delete(request_url, **con_params)
+
+		log.info('Received response from URL {}'.format(response.url))
+
+		if response.status_code == 401:
+			raise RuntimeError('API returned status code 401 Unauthorized, check the connection credentials')
+
+		if response.status_code != 204:
+			raise RuntimeError("Something went wrong, unable to delete data")
+
+		return response

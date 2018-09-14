@@ -1,7 +1,7 @@
 import logging
 
-from O365.connection import Connection
-from O365.fluent_message import Message
+from connection import Connection
+from fluent_message import Message
 
 log = logging.getLogger(__name__)
 

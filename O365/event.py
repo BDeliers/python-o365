@@ -1,5 +1,6 @@
-from O365.contact import Contact
-from O365.group import Group
+from contact import Contact
+from group import Group
+from connection import Connection
 import logging
 import json
 import requests
@@ -9,8 +10,8 @@ log = logging.getLogger(__name__)
 
 class Event( object ):
 	'''
-	Class for managing the creation and manipluation of events in a calendar. 
-	
+	Class for managing the creation and manipluation of events in a calendar.
+
 	Methods:
 		create -- Creates the event in a calendar.
 		update -- Sends local changes up to the cloud.
@@ -30,7 +31,7 @@ class Event( object ):
 		setAttendees -- sets the attendee list.
 		setStartTimeZone -- sets the timezone for the start of the event item.
 		setEndTimeZone -- sets the timezone for the end of the event item.
-		
+
 	Variables:
 		time_string -- Formated time string for translation to and from json.
 		create_url -- url for creating a new event.
@@ -38,7 +39,7 @@ class Event( object ):
 		delete_url -- url for deleting an event.
 	'''
 	#Formated time string for translation to and from json.
-	time_string = '%Y-%m-%dT%H:%M:%SZ'
+	time_string = '%Y-%m-%dT%H:%M:%S'
 	#takes a calendar ID
 	create_url = 'https://outlook.office365.com/api/v1.0/me/calendars/{0}/events'
 	#takes current event ID
@@ -50,7 +51,7 @@ class Event( object ):
 	def __init__(self,json=None,auth=None,cal=None,verify=True):
 		'''
 		Creates a new event wrapper.
-		
+
 		Keyword Argument:
 			json (default = None) -- json representation of an existing event. mostly just used by
 			this library internally for events that are downloaded by the callendar class.
@@ -70,21 +71,30 @@ class Event( object ):
 
 		self.verify = verify
 
+		self.startTimeZone = time.strftime("%Z", time.gmtime())
+		self.endTimeZone = time.strftime("%Z", time.gmtime())
+
 
 	def create(self,calendar=None):
 		'''
-		this method creates an event on the calender passed.
+		This method creates an event on the calender passed.
 
 		IMPORTANT: It returns that event now created in the calendar, if you wish
 		to make any changes to this event after you make it, use the returned value
 		and not this particular event any further.
-		
+
 		calendar -- a calendar class onto which you want this event to be created. If this is left
-		empty then the event's default calendar, specified at instancing, will be used. If no 
+		empty then the event's default calendar, specified at instancing, will be used. If no
 		default is specified, then the event cannot be created.
-		
+
 		'''
-		if not self.auth:
+		connection = Connection()
+
+		# Change URL if we use Oauth
+		if connection.is_valid() and connection.oauth != None:
+			self.create_url = self.create_url.replace("outlook.office365.com/api", "graph.microsoft.com")
+
+		elif not self.auth:
 			log.debug('failed authentication check when creating event.')
 			return False
 
@@ -107,7 +117,7 @@ class Event( object ):
 		response = None
 		try:
 			log.debug('sending post request now')
-			response = requests.post(self.create_url.format(calId),data,headers=headers,auth=self.auth,verify=self.verify)
+			response = connection.post_data(self.create_url.format(calId),data,headers=headers,auth=self.auth,verify=self.verify)
 			log.debug('sent post request.')
 			if response.status_code > 399:
 				log.error("Invalid response code [{}], response text: \n{}".format(response.status_code, response.text))
@@ -124,7 +134,14 @@ class Event( object ):
 
 	def update(self):
 		'''Updates an event that already exists in a calendar.'''
-		if not self.auth:
+
+		connection = Connection()
+
+		# Change URL if we use Oauth
+		if connection.is_valid() and connection.oauth != None:
+			self.update_url = self.update_url.replace("outlook.office365.com/api", "graph.microsoft.com")
+
+		elif not self.auth:
 			return False
 
 		if self.calendar:
@@ -138,8 +155,9 @@ class Event( object ):
 		data = json.dumps(self.json)
 
 		response = None
+		print(data)
 		try:
-			response = requests.patch(self.update_url.format(self.json['Id']),data,headers=headers,auth=self.auth,verify=self.verify)
+			response = connection.patch_data(self.update_url.format(self.json['id']),data,headers=headers,auth=self.auth,verify=self.verify)
 			log.debug('sending patch request now')
 		except Exception as e:
 			if response:
@@ -150,17 +168,24 @@ class Event( object ):
 
 		log.debug('response to event creation: %s',str(response))
 
-		return Event(response.json(),self.auth)
+		return Event(json.dumps(response),self.auth)
 
 
 	def delete(self):
 		'''
 		Delete's an event from the calendar it is in.
-		
-		But leaves you this handle. You could then change the calendar and transfer the event to 
+
+		But leaves you this handle. You could then change the calendar and transfer the event to
 		that new calendar. You know, if that's your thing.
 		'''
-		if not self.auth:
+
+		connection = Connection()
+
+		# Change URL if we use Oauth
+		if connection.is_valid() and connection.oauth != None:
+			self.delete_url = self.delete_url.replace("outlook.office365.com/api", "graph.microsoft.com")
+
+		elif not self.auth:
 			return False
 
 		headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
@@ -168,7 +193,7 @@ class Event( object ):
 		response = None
 		try:
 			log.debug('sending delete request')
-			response = requests.delete(self.delete_url.format(self.json['Id']),headers=headers,auth=self.auth,verify=self.verify)
+			response = connection.delete_data(self.delete_url.format(self.json['id']),headers=headers,auth=self.auth,verify=self.verify)
 
 		except Exception as e:
 			if response:
@@ -182,7 +207,7 @@ class Event( object ):
 	def toJson(self):
 		'''
 		Creates a JSON representation of the calendar event.
-		
+
 		oh. uh. I mean it simply returns the json representation that has always been in self.json.
 		'''
 		return self.json
@@ -190,40 +215,46 @@ class Event( object ):
 	def fullcalendarioJson(self):
 		'''
 		returns a form of the event suitable for the vehicle booking system here.
-		oh the joys of having a library to yourself! 
+		oh the joys of having a library to yourself!
 		'''
 		ret = {}
-		ret['title'] = self.json['Subject']
-		ret['driver'] = self.json['Organizer']['EmailAddress']['Name']
-		ret['driverEmail'] = self.json['Organizer']['EmailAddress']['Address']
-		ret['start'] = self.json['Start']
-		ret['end'] = self.json['End']
-		ret['IsAllDay'] = self.json['IsAllDay']
+		ret['title'] = self.json['subject']
+		ret['driver'] = self.json['organizer']['emailAddress']['name']
+		ret['driverEmail'] = self.json['organizer']['emailAddress']['address']
+		ret['start'] = self.json['start']
+		ret['end'] = self.json['end']
+		ret['isAllDay'] = self.json['isAllDay']
 		return ret
 
 	def getSubject(self):
 		'''Gets event subject line.'''
-		return self.json['Subject']
+		return self.json['subject']
 
 	def getBody(self):
 		'''Gets event body content.'''
-		return self.json['Body']['Content']
+		return self.json['body']['content']
 
 	def getStart(self):
 		'''Gets event start struct_time'''
-		return time.strptime(self.json['Start'], self.time_string)
+		if 'Z' in self.json['start']:
+			return time.strptime(self.json['start'], self.time_string+'Z')
+		else:
+			return time.strptime(self.json['start']["dateTime"].split('.')[0], self.time_string)
 
 	def getEnd(self):
 		'''Gets event end struct_time'''
-		return time.strptime(self.json['End'], self.time_string)
+		if 'Z' in self.json['end']:
+			return time.strptime(self.json['end'], self.time_string+'Z')
+		else:
+			return time.strptime(self.json['end']["dateTime"].split('.')[0], self.time_string)
 
 	def getAttendees(self):
 		'''Gets list of event attendees.'''
-		return self.json['Attendees']
+		return self.json['attendees']
 
 	def setSubject(self,val):
 		'''sets event subject line.'''
-		self.json['Subject'] = val
+		self.json['subject'] = val
 
 	def setBody(self,val,contentType='Text'):
 		'''
@@ -234,38 +265,39 @@ class Event( object ):
 
 		while not cont:
 			try:
-				self.json['Body']['Content'] = val
-				self.json['Body']['ContentType'] = contentType
+				self.json['body']['content'] = val
+				self.json['body']['contentType'] = contentType
 				cont = True
 			except:
-				self.json['Body'] = {}
+				self.json['body'] = {}
 
 	def setStart(self,val):
 		'''
 		sets event start time.
-		
+
 		Argument:
 			val - this argument can be passed in three different ways. You can pass it in as a int
 			or float, in which case the assumption is that it's seconds since Unix Epoch. You can
 			pass it in as a struct_time. Or you can pass in a string. The string must be formated
-			in the json style, which is %Y-%m-%dT%H:%M:%SZ. If you stray from that in your string
+			in the json style, which is %Y-%m-%dT%H:%M:%S. If you stray from that in your string
 			you will break the library.
 		'''
+
 		if isinstance(val,time.struct_time):
-			self.json['Start'] = time.strftime(self.time_string,val)
+			self.json['start'] = {"dateTime":time.strftime(self.time_string,val), "timeZone": self.startTimeZone}
 		elif isinstance(val,int):
-			self.json['Start'] = time.strftime(self.time_string,time.gmtime(val))
+			self.json['start'] = {"dateTime":time.strftime(self.time_string,time.gmtime(val)), "timeZone": self.startTimeZone}
 		elif isinstance(val,float):
-			self.json['Start'] = time.strftime(self.time_string,time.gmtime(val))
+			self.json['start'] = {"dateTime":time.strftime(self.time_string,time.gmtime(val)), "timeZone": self.startTimeZone}
 		else:
 			#this last one assumes you know how to format the time string. if it brakes, check
 			#your time string!
-			self.json['Start'] = val
+			self.json['start'] = val
 
 	def setEnd(self,val):
 		'''
 		sets event end time.
-		
+
 		Argument:
 			val - this argument can be passed in three different ways. You can pass it in as a int
 			or float, in which case the assumption is that it's seconds since Unix Epoch. You can
@@ -273,38 +305,39 @@ class Event( object ):
 			in the json style, which is %Y-%m-%dT%H:%M:%SZ. If you stray from that in your string
 			you will break the library.
 		'''
+
 		if isinstance(val,time.struct_time):
-			self.json['End'] = time.strftime(self.time_string,val)
+			self.json['end'] = {"dateTime":time.strftime(self.time_string,val), "timeZone": self.endTimeZone}
 		elif isinstance(val,int):
-			self.json['End'] = time.strftime(self.time_string,time.gmtime(val))
+			self.json['end'] = {"dateTime":time.strftime(self.time_string,time.gmtime(val)), "timeZone": self.endTimeZone}
 		elif isinstance(val,float):
-			self.json['End'] = time.strftime(self.time_string,time.gmtime(val))
+			self.json['end'] = {"dateTime":time.strftime(self.time_string,time.gmtime(val)), "timeZone": self.endTimeZone}
 		else:
 			#this last one assumes you know how to format the time string. if it brakes, check
 			#your time string!
-			self.json['End'] = val
+			self.json['end'] = val
 
 	def setAttendees(self,val):
 		'''
 		set the attendee list.
-		
+
 		val: the one argument this method takes can be very flexible. you can send:
 			a dictionary: this must to be a dictionary formated as such:
 				{"EmailAddress":{"Address":"recipient@example.com"}}
 				with other options such ass "Name" with address. but at minimum it must have this.
 			a list: this must to be a list of libraries formatted the way specified above,
 				or it can be a list of libraries objects of type Contact. The method will sort
-				out the libraries from the contacts. 
-			a string: this is if you just want to throw an email address. 
-			a contact: type Contact from this library. 
-		For each of these argument types the appropriate action will be taken to fit them to the 
+				out the libraries from the contacts.
+			a string: this is if you just want to throw an email address.
+			a contact: type Contact from this library.
+		For each of these argument types the appropriate action will be taken to fit them to the
 		needs of the library.
 		'''
-		self.json['Attendees'] = []
+		self.json['attendees'] = []
 		if isinstance(val,list):
-			self.json['Attendees'] = val
+			self.json['attendees'] = val
 		elif isinstance(val,dict):
-			self.json['Attendees'] = [val]
+			self.json['attendees'] = [val]
 		elif isinstance(val,str):
 			if '@' in val:
 				self.addAttendee(val)
@@ -315,19 +348,23 @@ class Event( object ):
 		else:
 			return False
 		return True
-	
+
 	def setStartTimeZone(self,val):
 		'''sets event start timezone'''
-		self.json['StartTimeZone'] = val
+
+		self.startTimeZone = val
+		self.json['start']["startTimeZone"] = val
 
 	def setEndTimeZone(self,val):
 		'''sets event end timezone'''
-		self.json['EndTimeZone'] = val
+
+		self.endTimeZone = val
+		self.json['end']["endTimeZone"] = val
 
 	def addAttendee(self,address,name=None):
 		'''
 		Adds a recipient to the attendee list.
-		
+
 		Arguments:
 		address -- the email address of the person you are sending to. <<< Important that.
 			Address can also be of type Contact or type Group.
@@ -338,14 +375,14 @@ class Event( object ):
 			argument is completely ignored.
 		'''
 		if isinstance(address,Contact):
-			self.json['Attendees'].append(address.getFirstEmailAddress())
+			self.json['attendees'].append(address.getFirstEmailAddress())
 		elif isinstance(address,Group):
 			for con in address.contacts:
-				self.json['Attendees'].append(address.getFirstEmailAddress())
+				self.json['attendees'].append(address.getFirstEmailAddress())
 		else:
 			if name is None:
 				name = address[:address.index('@')]
-			self.json['Attendees'].append({'EmailAddress':{'Address':address,'Name':name}})
+			self.json['attendees'].append({'emailAddress':{'address':address,'name':name}})
 
 	def setLocation(self,loc):
 		'''
@@ -361,21 +398,21 @@ class Event( object ):
 		you send into a string and set that as the display name.
 		'''
 		if 'Location' not in self.json:
-			self.json['Location'] = {"Address":None}
+			self.json['location'] = {"adress":None}
 
 		if isinstance(loc,dict):
-			self.json['Location'] = loc
+			self.json['location'] = loc
 		else:
-			self.json['Location']['DisplayName'] = str(loc)
+			self.json['location']['displayName'] = str(loc)
 
 	def getLocation(self):
 		'''
 		Get the current location, if one is set.
 		'''
-		if 'Location' in self.json:
-			return self.json['Location']
+		if 'location' in self.json:
+			return self.json['location']
 		return None
-		
-			
+
+
 
 #To the King!

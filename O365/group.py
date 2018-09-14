@@ -1,4 +1,4 @@
-from O365.contact import Contact
+from contact import Contact
 import logging
 import json
 import requests
@@ -8,11 +8,11 @@ log = logging.getLogger(__name__)
 class Group( object ):
 	'''
 	A wrapper class that handles all the contacts associated with a single Office365 account.
-	
+
 	Methods:
 		constructor -- takes your email and password for authentication.
 		getContacts -- begins the actual process of downloading contacts.
-	
+
 	Variables:
 		con_url -- the url that is requested for the retrival of the contacts.
 		con_folder_url -- the url that is used for requesting contacts from a specific folder.
@@ -65,10 +65,10 @@ class Group( object ):
 
 			if not duplicate:
 				self.contacts.append(Contact(contact,self.auth))
-			
+
 			log.debug('Appended Contact.')
-				
-			
+
+
 		log.debug('all calendars retrieved and put in to the list.')
 		return True
 

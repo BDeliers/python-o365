@@ -1,4 +1,4 @@
-from O365.message import Message
+from message import Message
 import logging
 import json
 import requests
@@ -8,11 +8,11 @@ log = logging.getLogger(__name__)
 class Inbox( object ):
 	'''
 	Wrapper class for an inbox which mostly holds a list of messages.
-	
+
 	Methods:
 		getMessages -- downloads messages to local memory.
-		
-	Variables: 
+
+	Variables:
 		inbox_url -- url used for fetching emails.
 	'''
 	#url for fetching emails. Takes a flag for whether they are read or not.
@@ -21,10 +21,10 @@ class Inbox( object ):
 	def __init__(self, auth, getNow=True, verify=True):
 		'''
 		Creates a new inbox wrapper. Send email and password for authentication.
-		
+
 		set getNow to false if you don't want to immedeatly download new messages.
 		'''
-		
+
 		log.debug('creating inbox for the email %s',auth[0])
 		self.auth = auth
 		self.messages = []
@@ -33,7 +33,7 @@ class Inbox( object ):
 		self.filters = ''
 		self.order_by = ''
 		self.verify = verify
-		
+
 		if getNow:
 			self.filters = 'IsRead eq false'
 			self.getMessages()
@@ -41,7 +41,7 @@ class Inbox( object ):
 	def getMessages(self, number = 10):
 		'''
 		Downloads messages to local memory.
-		
+
 		You create an inbox to be the container class for messages, this method
 		then pulls those messages down to the local disk. This is called in the
 		init method, so it's kind of pointless for you. Unless you think new
@@ -50,11 +50,11 @@ class Inbox( object ):
 		You can filter only certain emails by setting filters. See the set and
 		get filters methods for more information.
 
-				Returns true if there are messages. Returns false if there were no 
-				messages available that matched the filters specified. 
+				Returns true if there are messages. Returns false if there were no
+				messages available that matched the filters specified.
 		'''
 
-		log.debug('fetching messages.')			
+		log.debug('fetching messages.')
 		response = requests.get(self.inbox_url,auth=self.auth,params={'$orderby':self.order_by, '$filter':self.filters, '$top':number},verify=self.verify)
 		if response.status_code in [400, 500]:
 			self.errors = response.text
@@ -80,7 +80,7 @@ class Inbox( object ):
 						self.messages[i] = Message(message,self.auth)
 						duplicate = True
 						break
-				
+
 				if not duplicate:
 					self.messages.append(Message(message,self.auth))
 
@@ -114,7 +114,7 @@ class Inbox( object ):
 		can be found here:
 		https://msdn.microsoft.com/office/office365/APi/complex-types-for-mail-contacts-calendar#RESTAPIResourcesMessage
 		I may in the future have the ability to add these in yourself. but right now that is to complicated.
-		
+
 		Arguments:
 			f_string -- The string that represents the filters you want to enact.
 				should be something like: (HasAttachments eq true) and (IsRead eq false)
