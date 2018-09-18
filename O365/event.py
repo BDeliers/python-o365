@@ -415,7 +415,7 @@ class Event( object ):
 		if isinstance(loc,dict):
 			self.json['location'] = loc
 		else:
-			self.json['location']['displayName'] = str(loc)
+			self.json['location'] = {'displayName':str(loc)}
 
 	def getLocation(self):
 		'''
