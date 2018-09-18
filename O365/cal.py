@@ -4,8 +4,8 @@ import json
 import logging
 import time
 
-from event import Event
-from O365 import Connection
+from O365.event import Event
+from O365.connection import Connection
 
 log = logging.getLogger(__name__)
 
