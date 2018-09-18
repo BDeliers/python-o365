@@ -1,3 +1,53 @@
+## What I did on the original module :
+Microsoft is closing his old Outlook API soon. Now we have to use Microsoft Graph API.
+My work was to adapt the Calendar part of this module to use the new Microsoft Graph API, with an Oauth2 authentication.
+I also added the reminder and categories support for the events.
+My version works also a bit with the old auth system : you can donload your calendars and events, delete events, but not creating new ones.
+
+So now to use the Calendar part of the API with Oauth2, it's like that :
+
+```python
+from O365 import Connection, Schedule, Calendar, Event
+
+# Login
+oauth = Connection().oauth2("Oauth login", "Oauth key")
+
+# Get your calendars
+calendars = Schedule()
+calendars.getCalendars()
+mycal = ""
+
+for cal in calendars.calendars:
+	print(cal.getName())
+	print(cal.getId())
+
+	if cal.getName() == "MyCalendar":
+		mycal = cal
+
+# Get your events
+mycal.getEvents()
+evts = mycal.events
+
+for evt in evts:
+	print(evt.getSubject())
+	print(evt.getStart())
+
+	# Delete and event
+	evt.delete()
+
+# Create an event
+e = Event(cal=myCal)
+e.setSubject("Test")
+e.setBody("Test event")
+e.setStart(1537264800) # A timestamp
+e.setEnd(1537264800+3600)
+e.setReminder(False)
+e.setCategories(["Test", "Dev"])
+e.create()
+```
+
+---
+# Original Readme :
 # Python-O365 - Office365 for you server
 
 The objective O365 is to make it easy to make utilities that are to be run against an Office 365 account. If you wanted to script sending an email it could be as simple as:

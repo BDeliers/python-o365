@@ -1,6 +1,6 @@
-from attachment import Attachment
-from contact import Contact
-from group import Group
+from O365.attachment import Attachment
+from O365.contact import Contact
+from O365.group import Group
 import logging
 import json
 import requests

@@ -1,6 +1,6 @@
-from contact import Contact
-from group import Group
-from connection import Connection
+from O365.contact import Contact
+from O365.group import Group
+from O365.connection import Connection
 import logging
 import json
 import requests
@@ -23,6 +23,8 @@ class Event( object ):
 		getStart -- gets the starting time of the event. (struct_time)
 		getEnd -- gets the ending time of the event. (struct_time)
 		getAttendees -- gets the attendees of the event.
+		getReminder -- returns True if reminder is enabled, False if not.
+		getCategories -- returns a list of the event's categories.
 		addAttendee -- adds an attendee to the event. update needs to be called for notification.
 		setSubject -- sets the subject line of the event.
 		setBody -- sets the body of the event.
@@ -31,6 +33,8 @@ class Event( object ):
 		setAttendees -- sets the attendee list.
 		setStartTimeZone -- sets the timezone for the start of the event item.
 		setEndTimeZone -- sets the timezone for the end of the event item.
+		setReminder -- sets the reminder.
+		setCategories -- sets a list of the event's categories.
 
 	Variables:
 		time_string -- Formated time string for translation to and from json.
@@ -252,6 +256,14 @@ class Event( object ):
 		'''Gets list of event attendees.'''
 		return self.json['attendees']
 
+	def getReminder(self):
+		'''Gets the reminder's state.'''
+		return self.json['isReminderOn']
+
+	def getCategories(self):
+		'''Gets the list of categories for this event'''
+		return self.json['categories']
+
 	def setSubject(self,val):
 		'''sets event subject line.'''
 		self.json['subject'] = val
@@ -412,6 +424,28 @@ class Event( object ):
 		if 'location' in self.json:
 			return self.json['location']
 		return None
+
+	def setReminder(self,val):
+		'''
+		Sets the event's reminder.
+
+		Argument:
+		val -- a boolean
+		'''
+
+		if val == True or val == False:
+			self.json['isReminderOn'] = val
+
+	def setCategories(self,cats):
+		'''
+		Sets the event's categories.
+
+		Argument:
+		cats -- a list of categories
+		'''
+
+		if isinstance(cats, (list, tuple)):
+			self.json['categories'] = cats
 
 
 

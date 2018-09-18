@@ -5,7 +5,7 @@ import logging
 import time
 
 from event import Event
-from connection import Connection
+from O365 import Connection
 
 log = logging.getLogger(__name__)
 

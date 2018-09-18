@@ -1,5 +1,5 @@
-from cal import Calendar
-from connection import Connection
+from O365.cal import Calendar
+from O365.connection import Connection
 import logging
 import json
 import requests
