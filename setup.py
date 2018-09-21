@@ -14,13 +14,13 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='O365',
-      version='0.9.15',
+      version='0.10.0',
       description='Python library for working with Microsoft Office 365',
       long_description=long_description,
       long_description_content_type="text/markdown",
-      author='Toben Archer',
-      author_email='sandslash+O365@gmail.com',
-      url='https://github.com/Narcolapser/python-o365',
+      author='Balthazar DELIERS',
+      author_email='contact@bdeliers.com',
+      url='https://github.com/BDeliers/python-o365',
       packages=['O365'],
       install_requires=['requests', 'oauthlib', 'requests_oauthlib', 'future'],
       license='Apache 2.0',
